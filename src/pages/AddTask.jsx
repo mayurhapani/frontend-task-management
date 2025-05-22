@@ -31,6 +31,7 @@ export default function AddTask() {
         title,
         description,
         category,
+        status,
         assignTo: selectedUserId,
         dueDate: dueDate || null,
       };
@@ -212,7 +213,7 @@ export default function AddTask() {
                 <option value="low">Low</option>
               </select>
 
-              {isEditing && (
+              
                 <select
                   className="mb-3 p-2 rounded-sm"
                   value={status}
@@ -224,7 +225,7 @@ export default function AddTask() {
                   <option value="In Process">In Process</option>
                   <option value="Completed">Completed</option>
                 </select>
-              )}
+           
 
               <div className="mb-3">
                 <label className="block text-left text-sm text-gray-600 mb-1">Due Date (optional)</label>

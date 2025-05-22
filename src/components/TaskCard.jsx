@@ -168,7 +168,7 @@ export default function TaskCard({ task, user }) {
             className="px-3 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors"
             onClick={(e) => {
               e.stopPropagation();
-              editTask(task._id);
+              editTask(task?._id);
             }}
           >
             Edit
