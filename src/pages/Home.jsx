@@ -288,8 +288,8 @@ export default function Home() {
   return (
     <div className="bg-red-200 min-h-screen">
       <div className="container mx-auto">
-        <div className="pt-28 pb-10">
-          <div className="mb-6 text-center">
+        <div className="pt-28 md:pt-16 pb-10">
+          <div className="mb-4 text-center">
             <h1 className="text-3xl font-bold text-gray-800">
               Welcome {user?.name}
             </h1>
@@ -297,7 +297,7 @@ export default function Home() {
           </div>
           
           {/* Search and Filter Bar */}
-          <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
+          <div className="mb-4 bg-white p-4 rounded-lg shadow-md">
             <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3">
               <div className="flex-grow">
                 <input
@@ -342,7 +342,7 @@ export default function Home() {
           </div>
           
           <DragDropContext onDragEnd={onDragEnd}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
               {/* Not Started Column */}
               <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
                 <div className={`p-3 border-b ${COLUMNS.NOT_STARTED.className}`}>
