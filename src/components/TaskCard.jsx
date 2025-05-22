@@ -11,13 +11,13 @@ export default function TaskCard({ task, user }) {
 
   const BASE_URL = import.meta.env.VITE_BASE_URL;
 
-  const completeTask = async (id) => {
+  const changeStatus = async (id, newStatus) => {
     try {
       const token = localStorage.getItem("token");
 
       const response = await axios.patch(
-        `${BASE_URL}/tasks/complete/${id}`,
-        {},
+        `${BASE_URL}/tasks/status/${id}`,
+        { status: newStatus },
         {
           withCredentials: true,
           headers: {
@@ -25,7 +25,7 @@ export default function TaskCard({ task, user }) {
           },
         }
       );
-      console.log("complete task", response);
+      console.log("status updated", response);
 
       toast.success(response.data.message);
       setIsRefresh(!isRefresh);
@@ -61,99 +61,97 @@ export default function TaskCard({ task, user }) {
       }
     }
   };
+  
+  const editTask = (id) => {
+    navigate(`/editTask/${id}`);
+  };
+
+  const getStatusColor = (status) => {
+    switch(status) {
+      case "Not Started": return "text-red-500";
+      case "In Process": return "text-yellow-500";
+      case "Completed": return "text-green-500";
+      default: return "text-gray-500";
+    }
+  };
+  
+  const getCategoryBadgeColor = (category) => {
+    switch(category) {
+      case "high": return "bg-red-100 text-red-800 border-red-200";
+      case "medium": return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case "low": return "bg-green-100 text-green-800 border-green-200";
+      default: return "bg-gray-100 text-gray-800 border-gray-200";
+    }
+  };
 
   return (
-    <>
-      <div className="h-100 w-full flex items-center justify-center bg-teal-lightest font-sans">
-        <div
-          className={`  rounded shadow-xl p-3 mb-4 w-full lg:w-3/4 lg:max-w-lg ${
-            task.isCompleted ? "bg-zinc-300" : "bg-white"
-          }`}
-        >
-          <div>
-            <div className="flex  items-center justify-between">
-              <h3
-                className={`text-lg font-semibold ${
-                  task.isCompleted ? "line-through text-gray-400" : ""
-                }`}
-              >
-                {task.title}
-              </h3>
-              <div className={`items-center flex `}>
-                <p>
-                  {" "}
-                  <span>
-                    {`${
-                      user.role == "user"
-                        ? task.createdBy.name == user.name
-                          ? "By : @You"
-                          : "By : @Admin"
-                        : task.createdBy.name == user.name
-                        ? "By : @You"
-                        : `By : @${task.createdBy.name}`
-                    }`}
-                  </span>
-                </p>
-              </div>
+    <div className="card-container">
+      <div className={`rounded-lg shadow-md p-4 mb-2 border-l-4 transition-all hover:shadow-lg ${
+        task.status === "Completed" 
+          ? "bg-gray-100 border-gray-400" 
+          : task.status === "In Process" 
+            ? "bg-yellow-50 border-yellow-400" 
+            : "bg-white border-blue-400"
+      }`}>
+        <div className="flex flex-col gap-2">
+          {/* Title section */}
+          <div className="flex justify-between items-start">
+            <h3 className={`text-lg font-semibold ${
+              task.status === "Completed" ? "text-gray-500" : "text-gray-800"
+            }`}>
+              {task.title}
+            </h3>
+            <div className={`px-2 py-1 rounded-full text-xs font-medium ${getCategoryBadgeColor(task.category)}`}>
+              {task.category}
             </div>
-            <div className="flex mb-4 items-center justify-between">
-              <p className={`text-md ${task.isCompleted ? "line-through text-gray-400" : ""}`}>
-                {task.description}
-              </p>
-              <div className={`items-center ${user.role == "user" ? "hidden" : "flex"}`}>
-                <p>
-                  for : <span>@{task?.assignTo?.name}</span>
-                </p>
-              </div>
+          </div>
+
+          {/* Description */}
+          <p className={`text-sm mt-1 ${
+            task.status === "Completed" ? "text-gray-400" : "text-gray-600"
+          }`}>
+            {task.description}
+          </p>
+
+          {/* Status and assignee info */}
+          <div className="flex justify-between items-center mt-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-gray-600">Status:</span>
+              <span className={`font-medium ${getStatusColor(task.status)}`}>
+                {task.status}
+              </span>
             </div>
-            <div className="flex justify-between items-center">
-              <div className="flex justify-center items-center">
-                <p className="text-sm font-semibold text-gray-600">
-                  Status :{" "}
-                  <span className={task.isCompleted ? "text-green-500" : "text-red-500"}>
-                    {task.isCompleted ? " Done" : " Pending"}
-                  </span>
-                </p>
-              </div>
-              <div className="flex justify-center items-center rounded">
-                <p className="text-sm font-semibold text-gray-600">
-                  Category :{" "}
-                  <span
-                    className={
-                      task.category == "high"
-                        ? "text-red-500"
-                        : task.category == "medium"
-                        ? "text-yellow-500"
-                        : "text-green-500"
-                    }
-                  >
-                    {task.category}
-                  </span>
-                </p>
-              </div>
-              <div className="flex justify-center items-center">
-                <button
-                  className={`flex-no-shrink px-1 mr-2 border-2 rounded hover:text-white text-sm  ${
-                    task.isCompleted
-                      ? "text-gray-600 border-gray-600 hover:bg-gray-600"
-                      : "text-green-600 border-green-600 hover:bg-green-600"
-                  }`}
-                  onClick={() => completeTask(task._id)}
-                >
-                  {task.isCompleted ? "Not Done" : " Done"}
-                </button>
-                <button
-                  className="flex-no-shrink px-1 text-sm border-2 rounded text-red-600 border-red-600 hover:text-white hover:bg-red-600"
-                  onClick={() => deleteTask(task._id)}
-                >
-                  Remove
-                </button>
-              </div>
+            <div className="flex items-center gap-1">
+              <span className="text-gray-600">For:</span>
+              <span className="font-medium text-gray-700">
+                @{task?.assignTo?.name}
+              </span>
             </div>
+          </div>
+
+          {/* Created by info */}
+          <div className="text-xs text-gray-500 mt-1">
+            Created by: {task.createdBy?.name === user.name ? "You" : task.createdBy?.name}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex justify-end gap-2 mt-3">
+            <button
+              className="px-3 py-1 text-xs font-medium rounded bg-yellow-100 text-yellow-700 hover:bg-yellow-200 transition-colors"
+              onClick={() => editTask(task._id)}
+            >
+              Edit
+            </button>
+            <button
+              className="px-3 py-1 text-xs font-medium rounded bg-red-100 text-red-700 hover:bg-red-200 transition-colors"
+              onClick={() => deleteTask(task._id)}
+            >
+              Remove
+            </button>
           </div>
         </div>
       </div>
-    </>
+    </div>
   );
 }
 

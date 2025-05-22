@@ -100,6 +100,7 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/addTask" element={<AddTask />} />
+            <Route path="/editTask/:taskId" element={<AddTask />} />
             <Route path="/logout" element={<Logout />} />
             <Route path="/signin" element={<Signin />} />
             <Route path="/signup" element={<Signup />} />
