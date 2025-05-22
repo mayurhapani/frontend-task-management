@@ -8,35 +8,44 @@ import Cookies from "universal-cookie";
 import { subscribeToTaskUpdates } from "../js/socket.js";
 import { messaging, requestPermission, onMessageListener } from "../firebase";
 import { onMessage } from "firebase/messaging";
-import { DragDropContext, Droppable, Draggable } from "react-beautiful-dnd";
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 
 const cookies = new Cookies();
 
-// Column definitions for the Kanban board
-const columns = {
-  "Not Started": {
-    id: "not-started",
+// Static column definitions to ensure consistent IDs
+const COLUMNS = {
+  NOT_STARTED: {
+    id: "notStarted",
     title: "Not Started",
-    color: "blue"
+    status: "Not Started",
+    className: "bg-blue-100 border-blue-200 text-blue-800"
   },
-  "In Process": {
-    id: "in-process",
+  IN_PROCESS: {
+    id: "inProcess",
     title: "In Process",
-    color: "yellow"
+    status: "In Process",
+    className: "bg-yellow-100 border-yellow-200 text-yellow-800"
   },
-  "Completed": {
+  COMPLETED: {
     id: "completed",
     title: "Completed",
-    color: "green"
+    status: "Completed",
+    className: "bg-green-100 border-green-200 text-green-800"
   }
 };
 
 export default function Home() {
   const [user, setUser] = useState({});
+  const [allTasks, setAllTasks] = useState([]);
   const [tasks, setTasks] = useState([]);
   const [notStartedTasks, setNotStartedTasks] = useState([]);
   const [inProcessTasks, setInProcessTasks] = useState([]);
   const [completedTasks, setCompletedTasks] = useState([]);
+  
+  // Search and filter states
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
 
   const { isRefresh, setIsRefresh } = useContext(AuthContext);
   const navigate = useNavigate();
@@ -44,66 +53,107 @@ export default function Home() {
   const BASE_URL = import.meta.env.VITE_BASE_URL;
   
   // Handle drag end event
-  const onDragEnd = async (result) => {
+  const onDragEnd = (result) => {
     const { source, destination, draggableId } = result;
     
-    // If dropped outside a droppable area or same column
+    // Drop was cancelled or dropped in the same column
     if (!destination || source.droppableId === destination.droppableId) {
       return;
     }
     
-    // Determine new status based on destination column
-    let newStatus;
-    if (destination.droppableId === "not-started") {
-      newStatus = "Not Started";
-    } else if (destination.droppableId === "in-process") {
-      newStatus = "In Process";
-    } else if (destination.droppableId === "completed") {
-      newStatus = "Completed";
-    }
+    // Find the destination column to get the new status
+    let newStatus = "";
+    Object.values(COLUMNS).forEach(column => {
+      if (column.id === destination.droppableId) {
+        newStatus = column.status;
+      }
+    });
+    
+    if (!newStatus) return;
     
     // Update task status in backend
-    try {
-      const token = localStorage.getItem("token");
-      
-      await axios.patch(
-        `${BASE_URL}/tasks/status/${draggableId}`,
-        { status: newStatus },
-        {
-          withCredentials: true,
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
-      
+    const token = localStorage.getItem("token");
+    
+    axios.patch(
+      `${BASE_URL}/tasks/status/${draggableId}`,
+      { status: newStatus },
+      {
+        withCredentials: true,
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    )
+    .then(() => {
       // Update local state
-      setTasks(prevTasks => {
-        return prevTasks.map(task => {
-          if (task._id === draggableId) {
-            return { ...task, status: newStatus };
-          }
-          return task;
-        });
+      const updatedTasks = allTasks.map(task => {
+        if (task._id === draggableId) {
+          return { ...task, status: newStatus };
+        }
+        return task;
       });
       
-      // Re-filter tasks by status
-      updateTaskLists();
+      setAllTasks(updatedTasks);
+      filterAndSortTasks(updatedTasks);
       
       toast.success(`Task moved to ${newStatus}`);
-    } catch (error) {
+    })
+    .catch(error => {
       if (error.response) {
         toast.error(error.response.data.message);
       } else {
         toast.error(error.message);
       }
-    }
+    });
   };
   
-  const updateTaskLists = () => {
-    setNotStartedTasks(tasks.filter(task => task.status === "Not Started"));
-    setInProcessTasks(tasks.filter(task => task.status === "In Process"));
-    setCompletedTasks(tasks.filter(task => task.status === "Completed"));
+  // Search function
+  const handleSearch = (e) => {
+    e.preventDefault();
+    setIsSearching(true);
+    
+    const filtered = allTasks.filter(task => {
+      const searchableFields = [
+        task.title,
+        task.description,
+        task.createdBy?.name,
+        task.assignTo?.name
+      ];
+      
+      const matchesSearch = searchableFields.some(field => 
+        field && field.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+      
+      const matchesDate = dateFilter 
+        ? new Date(task.createdAt).toLocaleDateString() === new Date(dateFilter).toLocaleDateString()
+        : true;
+      
+      return matchesSearch && matchesDate;
+    });
+    
+    filterAndSortTasks(filtered);
+  };
+  
+  // Clear search
+  const clearSearch = () => {
+    setSearchTerm("");
+    setDateFilter("");
+    setIsSearching(false);
+    filterAndSortTasks(allTasks);
+  };
+  
+  // Filter and sort tasks
+  const filterAndSortTasks = (tasksToFilter) => {
+    const categoryOrder = { high: 1, medium: 2, low: 3 };
+    
+    const sortedTasks = [...tasksToFilter].sort((a, b) => {
+      return categoryOrder[a.category] - categoryOrder[b.category];
+    });
+    
+    setTasks(sortedTasks);
+    setNotStartedTasks(sortedTasks.filter(task => task.status === "Not Started"));
+    setInProcessTasks(sortedTasks.filter(task => task.status === "In Process"));
+    setCompletedTasks(sortedTasks.filter(task => task.status === "Completed"));
   };
 
   useEffect(() => {
@@ -128,7 +178,7 @@ export default function Home() {
               },
             }
           );
-          console.log("FCM token updated successfully");
+          // console.log("FCM token updated successfully");
         } catch (error) {
           console.error("Error updating FCM token:", error);
         }
@@ -146,20 +196,11 @@ export default function Home() {
             Authorization: "Bearer " + token,
           },
         });
-        const tasks = response.data.data;
-
-        const categoryOrder = { high: 1, medium: 2, low: 3 };
-
-        const sortedTasks = tasks.sort((a, b) => {
-          return categoryOrder[a.category] - categoryOrder[b.category];
-        });
-
-        setTasks(sortedTasks);
-        
-        // Filter tasks by status
-        setNotStartedTasks(sortedTasks.filter(task => task.status === "Not Started"));
-        setInProcessTasks(sortedTasks.filter(task => task.status === "In Process"));
-        setCompletedTasks(sortedTasks.filter(task => task.status === "Completed"));
+        const fetchedTasks = response.data.data;
+        setAllTasks(fetchedTasks);
+        filterAndSortTasks(fetchedTasks);
+        // console.log("fetchedTasks",fetchedTasks);
+        // console.log("allTasks",allTasks);
       } catch (error) {
         if (error.response) {
           toast.error(error.response.data.message);
@@ -193,15 +234,13 @@ export default function Home() {
 
     // Subscribe to real-time updates
     subscribeToTaskUpdates((updatedTask) => {
-      setTasks((prevTasks) => {
+      setAllTasks((prevTasks) => {
         const newTasks = prevTasks.map((task) => 
           (task._id === updatedTask._id ? updatedTask : task)
         );
         
-        // Update task lists
-        setNotStartedTasks(newTasks.filter(task => task.status === "Not Started"));
-        setInProcessTasks(newTasks.filter(task => task.status === "In Process"));
-        setCompletedTasks(newTasks.filter(task => task.status === "Completed"));
+        // Update filtered tasks
+        filterAndSortTasks(newTasks);
         
         return newTasks;
       });
@@ -246,42 +285,6 @@ export default function Home() {
     }
   };
 
-  const renderColumnTasks = (columnId, tasks) => {
-    return (
-      <Droppable droppableId={columnId}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={`space-y-3 min-h-[300px] transition-colors ${
-              snapshot.isDraggingOver ? "bg-gray-100" : ""
-            }`}
-          >
-            {tasks.length > 0 ? (
-              tasks.map((task, index) => (
-                <Draggable key={task._id} draggableId={task._id} index={index}>
-                  {(provided, snapshot) => (
-                    <div
-                      ref={provided.innerRef}
-                      {...provided.draggableProps}
-                      {...provided.dragHandleProps}
-                      className={`transition-transform ${snapshot.isDragging ? "rotate-1 scale-105" : ""}`}
-                    >
-                      <TaskCard task={task} user={user} />
-                    </div>
-                  )}
-                </Draggable>
-              ))
-            ) : (
-              <p className="text-center p-4 text-gray-500">No tasks</p>
-            )}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
-    );
-  };
-
   return (
     <div className="bg-red-200 min-h-screen">
       <div className="container mx-auto">
@@ -293,48 +296,195 @@ export default function Home() {
             <p className="mt-2 text-gray-600">Drag tasks between columns to update their status</p>
           </div>
           
+          {/* Search and Filter Bar */}
+          <div className="mb-6 bg-white p-4 rounded-lg shadow-md">
+            <form onSubmit={handleSearch} className="flex flex-col md:flex-row gap-3">
+              <div className="flex-grow">
+                <input
+                  type="text"
+                  placeholder="Search by title, description, creator or assignee..."
+                  className="w-full p-2 border rounded-md"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              <div className="md:w-48">
+                <input
+                  type="date"
+                  className="w-full p-2 border rounded-md"
+                  value={dateFilter}
+                  onChange={(e) => setDateFilter(e.target.value)}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600"
+                >
+                  Search
+                </button>
+                {isSearching && (
+                  <button
+                    type="button"
+                    className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400"
+                    onClick={clearSearch}
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+            </form>
+            {isSearching && (
+              <div className="mt-2 text-sm text-gray-600">
+                Showing {tasks.length} filtered results
+              </div>
+            )}
+          </div>
+          
           <DragDropContext onDragEnd={onDragEnd}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {/* Not Started Column */}
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="bg-blue-100 p-3 border-b border-blue-200">
-                  <h2 className="text-xl font-semibold text-center text-blue-800">Not Started</h2>
+              <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                <div className={`p-3 border-b ${COLUMNS.NOT_STARTED.className}`}>
+                  <h2 className="text-xl font-semibold text-center">
+                    {COLUMNS.NOT_STARTED.title}
+                  </h2>
                 </div>
-                <div className="p-4">
-                  {renderColumnTasks("not-started", notStartedTasks)}
-                </div>
+                <Droppable droppableId={COLUMNS.NOT_STARTED.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`p-4 space-y-2 overflow-y-auto h-[500px] transition-colors ${
+                        snapshot.isDraggingOver ? "bg-blue-50" : ""
+                      }`}
+                    >
+                      {notStartedTasks.length > 0 ? (
+                        notStartedTasks.map((task, index) => (
+                          <Draggable key={task._id} draggableId={task._id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={{
+                                  ...provided.draggableProps.style,
+                                  cursor: 'grab'
+                                }}
+                                className={`transition-transform ${snapshot.isDragging ? "rotate-1 scale-105 shadow-lg z-10" : ""}`}
+                              >
+                                <TaskCard task={task} user={user} />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))
+                      ) : (
+                        <p className="text-center text-gray-500 p-4">No tasks</p>
+                      )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
               
               {/* In Process Column */}
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="bg-yellow-100 p-3 border-b border-yellow-200">
-                  <h2 className="text-xl font-semibold text-center text-yellow-800">In Process</h2>
+              <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                <div className={`p-3 border-b ${COLUMNS.IN_PROCESS.className}`}>
+                  <h2 className="text-xl font-semibold text-center">
+                    {COLUMNS.IN_PROCESS.title}
+                  </h2>
                 </div>
-                <div className="p-4">
-                  {renderColumnTasks("in-process", inProcessTasks)}
-                </div>
+                <Droppable droppableId={COLUMNS.IN_PROCESS.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`p-4 space-y-2 overflow-y-auto h-[500px] transition-colors ${
+                        snapshot.isDraggingOver ? "bg-yellow-50" : ""
+                      }`}
+                    >
+                      {inProcessTasks.length > 0 ? (
+                        inProcessTasks.map((task, index) => (
+                          <Draggable key={task._id} draggableId={task._id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={{
+                                  ...provided.draggableProps.style,
+                                  cursor: 'grab'
+                                }}
+                                className={`transition-transform ${snapshot.isDragging ? "rotate-1 scale-105 shadow-lg z-10" : ""}`}
+                              >
+                                <TaskCard task={task} user={user} />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))
+                      ) : (
+                        <p className="text-center text-gray-500 p-4">No tasks</p>
+                      )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
               
               {/* Completed Column */}
-              <div className="bg-white rounded-lg shadow-md overflow-hidden">
-                <div className="bg-green-100 p-3 border-b border-green-200">
-                  <h2 className="text-xl font-semibold text-center text-green-800">Completed</h2>
+              <div className="bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+                <div className={`p-3 border-b ${COLUMNS.COMPLETED.className}`}>
+                  <h2 className="text-xl font-semibold text-center">
+                    {COLUMNS.COMPLETED.title}
+                  </h2>
                 </div>
-                <div className="p-4">
-                  {renderColumnTasks("completed", completedTasks)}
-                </div>
+                <Droppable droppableId={COLUMNS.COMPLETED.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
+                      className={`p-4 space-y-2 overflow-y-auto h-[500px] transition-colors ${
+                        snapshot.isDraggingOver ? "bg-green-50" : ""
+                      }`}
+                    >
+                      {completedTasks.length > 0 ? (
+                        completedTasks.map((task, index) => (
+                          <Draggable key={task._id} draggableId={task._id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={{
+                                  ...provided.draggableProps.style,
+                                  cursor: 'grab'
+                                }}
+                                className={`transition-transform ${snapshot.isDragging ? "rotate-1 scale-105 shadow-lg z-10" : ""}`}
+                              >
+                                <TaskCard task={task} user={user} />
+                              </div>
+                            )}
+                          </Draggable>
+                        ))
+                      ) : (
+                        <p className="text-center text-gray-500 p-4">No tasks</p>
+                      )}
+                      {provided.placeholder}
+                    </div>
+                  )}
+                </Droppable>
               </div>
             </div>
           </DragDropContext>
           
-          <div className="mt-8 text-center">
+          {/* <div className="mt-8 text-center">
             <button 
               onClick={sendTestNotification}
               className="px-6 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors shadow-md"
             >
               Send Test Notification
             </button>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

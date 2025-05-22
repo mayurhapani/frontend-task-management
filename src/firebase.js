@@ -33,7 +33,7 @@ export const requestPermission = async () => {
             "BAE07LR0f5clAa9CW3KAbb03wrqL7fgMrR4PP9BegR-Cv-DxW5rWjiH-9X7sJPwgYrJcKyEOldkkhIdKqtlSWQ4",
         });
         if (token) {
-          console.log("FCM Token:", token);
+          // console.log("FCM Token:", token);
           return token;
         } else {
           console.warn("No registration token available.");

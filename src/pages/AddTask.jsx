@@ -13,6 +13,7 @@ export default function AddTask() {
   const [users, setUsers] = useState([]);
   const [user, setUser] = useState({});
   const [isEditing, setIsEditing] = useState(false);
+  const [dueDate, setDueDate] = useState("");
   
   const { taskId } = useParams();
   const navigate = useNavigate();
@@ -31,6 +32,7 @@ export default function AddTask() {
         description,
         category,
         assignTo: selectedUserId,
+        dueDate: dueDate || null,
       };
       
       if (isEditing) {
@@ -98,6 +100,14 @@ export default function AddTask() {
           setCategory(task.category);
           setStatus(task.status);
           setSelectedUserId(task.assignTo._id);
+          
+          // Set due date if it exists
+          if (task.dueDate) {
+            // Format the date for the input field (YYYY-MM-DD)
+            const date = new Date(task.dueDate);
+            const formattedDate = date.toISOString().split('T')[0];
+            setDueDate(formattedDate);
+          }
         } catch (error) {
           if (error.response) {
             toast.error(error.response.data.message);
@@ -215,6 +225,19 @@ export default function AddTask() {
                   <option value="Completed">Completed</option>
                 </select>
               )}
+
+              <div className="mb-3">
+                <label className="block text-left text-sm text-gray-600 mb-1">Due Date (optional)</label>
+                <input
+                  className="w-full p-2 rounded-sm"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => {
+                    setDueDate(e.target.value);
+                  }}
+                  name="dueDate"
+                />
+              </div>
 
               <select
                 className="mb-3 p-2 rounded-sm"

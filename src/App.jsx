@@ -44,7 +44,7 @@ function App() {
     const getTokenAndUpdate = async () => {
       const fcmToken = await requestPermission();
       if (fcmToken) {
-        console.log("FCM token:", fcmToken);
+        // console.log("FCM token:", fcmToken);
         try {
           await axios.patch(
             `${BASE_URL}/users/updateFcmToken`,
@@ -56,7 +56,7 @@ function App() {
               },
             }
           );
-          console.log("FCM token updated successfully");
+          // console.log("FCM token updated successfully");
         } catch (error) {
           console.error("Error updating FCM token:", error);
         }
@@ -81,7 +81,7 @@ function App() {
               },
             }
           );
-          console.log("FCM token updated successfully");
+          // console.log("FCM token updated successfully");
         } catch (error) {
           console.error("Error updating FCM token:", error);
         }
@@ -93,7 +93,10 @@ function App() {
 
   return (
     <>
-      <BrowserRouter>
+      <BrowserRouter future={{
+        v7_startTransition: true,
+        v7_relativeSplatPath: true,
+      }}>
         <AuthProvider>
           <Header />
           <Routes>
